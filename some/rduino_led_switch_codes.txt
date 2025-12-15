@@ -1,0 +1,60 @@
+CODE-1
+
+int ON_MODE = 0;
+
+void setup() {
+    //start serial connection
+    Serial.begin(9600);
+    //configure pin2 as an input and enable the internal pull-up resistor
+    pinMode(5, INPUT_PULLUP);
+    pinMode(13, OUTPUT); // connect an LED at pin13.
+  }
+void loop() {
+  //read the pushbutton value into a variable
+  int sensorVal = digitalRead(5);
+  //print out the value of the pushbutton
+  Serial.println(sensorVal);
+  // Keep in mind the pullup means the pushbutton's
+  // logic is inverted. It goes HIGH when it's open,
+  // and LOW when it's pressed. Turn on pin 13 when the
+  // button's pressed, and off when it's not:
+  if (sensorVal == LOW) {
+    ON_MODE = HIGH;
+  }
+  else {
+    ON_MODE = LOW;
+  }
+
+  digitalWrite(13, ON_MODE);
+}
+
+CODE-2
+
+int ledState = LOW;        // current LED state
+int lastButtonState = HIGH; // because INPUT_PULLUP
+unsigned long lastDebounceTime = 0;
+const unsigned long debounceDelay = 50;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(5, INPUT_PULLUP);
+  pinMode(13, OUTPUT);
+  digitalWrite(13, ledState);
+}
+
+void loop() {
+  int reading = digitalRead(5);
+
+  // detect button press (HIGH → LOW)
+  if (reading == LOW && lastButtonState == HIGH) {
+    // debounce
+    if (millis() - lastDebounceTime > debounceDelay) {
+      ledState = !ledState;          // toggle LED
+      digitalWrite(13, ledState);
+      lastDebounceTime = millis();
+    }
+  }
+
+  lastButtonState = reading;
+}
+

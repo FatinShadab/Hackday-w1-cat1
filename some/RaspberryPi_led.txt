@@ -1,0 +1,34 @@
+CONNECTION :
+
+	Pi	breadboard
+	6   ->  resgistor(220ohm)
+	8   ->  led(large)
+
+CODE 1:
+
+from gpiozero import LED
+from time import sleep
+
+led = LED(14)
+
+# Blink LED forever using toggle()
+while True:
+    led.toggle()
+    sleep(1)
+
+CODE 2:
+
+from gpiozero import LED
+from time import sleep
+
+led = LED(14)
+
+# blinking an LED forever
+while True:
+    # set the LED ON for one second
+    led.on()
+    sleep(1)
+
+    # set the LED OFF for one second
+    led.off()
+    sleep(1)

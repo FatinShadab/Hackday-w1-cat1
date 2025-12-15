@@ -1,0 +1,117 @@
+MQ-2 CONNECTION : 
+
+	UNO	MQ2
+	5v  ->  Vcc
+	GND ->  GND
+	A0  ->  A0
+	2   ->  D0
+
+OLED CONNECTION :
+
+	UNO     OLED
+	5v  ->  Vcc
+	GND ->  GND
+	A4  ->  SCL
+	A5  ->  SDA
+
+CODE :
+
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+// ---------- OLED CONFIG ----------
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET -1
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+// ---------- MQ-2 CONFIG ----------
+const int sensorPin = A0;
+const int Buzz = 8;
+const int relay = 7;
+
+#define RL 10.0     // Load resistance (kΩ)
+#define m -0.263
+#define b 0.42
+#define Ro 20.0
+
+void setup() {
+  Serial.begin(9600);
+
+  // OLED init
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED not found!");
+    while (1);
+  }
+
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+
+  display.setCursor(0, 0);
+  display.println("MQ-2 Gas Sensor");
+  display.println("Warming up...");
+  display.display();
+
+  Serial.println("MQ-2 Gas Sensor Initializing...");
+  delay(20000);
+
+  pinMode(sensorPin, INPUT);
+  pinMode(Buzz, OUTPUT);
+  pinMode(relay, OUTPUT);
+
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("Sensor Ready!");
+  display.display();
+
+  Serial.println("Sensor Ready!");
+  Serial.println("ADC\tVoltage\tPPM");
+}
+
+void loop() {
+  float adcValue = analogRead(sensorPin);
+  float voltage = adcValue * (5.0 / 1023.0);
+
+  if (voltage == 0) return;
+
+  float Rs = ((5.0 * RL) / voltage) - RL;
+  float ratio = Rs / Ro;
+  float ppm = pow(10, ((log10(ratio) - b) / m));
+
+  // -------- SERIAL OUTPUT --------
+  Serial.print(adcValue);
+  Serial.print("\t");
+  Serial.print(voltage, 2);
+  Serial.print("\t");
+  Serial.println(ppm, 2);
+
+  // -------- OLED OUTPUT --------
+  display.clearDisplay();
+  display.setCursor(0, 0);
+
+  display.println("MQ-2 Gas Level");
+  display.println("----------------");
+  display.print("ADC: ");
+  display.println(adcValue);
+
+  display.print("Volt: ");
+  display.print(voltage, 2);
+  display.println(" V");
+
+  display.print("PPM: ");
+  display.println(ppm, 1);
+
+  if (ppm > 300) {
+    display.println("ALERT!");
+    digitalWrite(Buzz, HIGH);
+    digitalWrite(relay, HIGH);
+  } else {
+    digitalWrite(Buzz, LOW);
+    digitalWrite(relay, LOW);
+  }
+
+  display.display();
+  delay(1000);
+}

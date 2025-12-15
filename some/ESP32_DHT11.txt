@@ -1,0 +1,190 @@
+CONNECTION :
+
+	ESP32	 DHT11
+	3U   ->  Vcc
+        GND  ->  GND
+	D2   ->  SIG
+
+PHP CODE :
+
+<?php
+// Database connection variables
+$hostname = "localhost";
+$username = "root";
+$password = "";  // Leave blank if no password set
+$database = "sensor_db";
+
+// Create connection
+$conn = mysqli_connect($hostname, $username, $password, $database);
+
+// Check connection
+if (!$conn) {
+    die("Connection failed: " . mysqli_connect_error());
+}
+
+echo "Database connection is OK<br>";
+
+// Check if temperature and humidity data is received from ESP32
+if(isset($_POST["temperature"]) && isset($_POST["humidity"])) {
+    
+    // Store received data in variables
+    $t = $_POST["temperature"];
+    $h = $_POST["humidity"];
+    
+    // Create SQL query to insert data into database
+    $sql = "INSERT INTO dht11 (temperature, humidity) VALUES (".$t.", ".$h.")";
+    
+    // Execute query and check if successful
+    if (mysqli_query($conn, $sql)) {
+        echo "New record created successfully<br>";
+        echo "Temperature: " . $t . " °C<br>";
+        echo "Humidity: " . $h . " %<br>";
+    } else {
+        echo "Error: " . $sql . "<br>" . mysqli_error($conn);
+    }
+} else {
+    echo "No temperature or humidity data received!<br>";
+}
+
+// Close database connection
+mysqli_close($conn);
+?>
+
+
+Arduino code :
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <DHT.h>
+
+// DHT11 Sensor Configuration
+#define DHTPIN 19       // GPIO pin connected to DHT11 data pin
+#define DHTTYPE DHT11   // DHT11 sensor type
+DHT dht11(DHTPIN, DHTTYPE);
+
+// XAMPP Server Configuration
+String URL = "http://192.168.1.100/dht11_project/receive_data.php";  // CHANGE IP ADDRESS
+
+// WiFi Credentials
+const char* ssid = "ENTER_WIFI_SSID";          // CHANGE THIS
+const char* password = "ENTER_WIFI_PASSWORD";  // CHANGE THIS
+
+// Variables to store sensor data
+int temperature = 0;
+int humidity = 0;
+
+// ============================================================
+// SETUP FUNCTION - Runs once at startup
+// ============================================================
+void setup() {
+    Serial.begin(115200);
+    
+    // Initialize DHT11 sensor
+    dht11.begin();
+    
+    // Connect to WiFi
+    connectWiFi();
+}
+
+// ============================================================
+// LOOP FUNCTION - Runs continuously
+// ============================================================
+void loop() {
+    // Check if WiFi connection is still active
+    if(WiFi.status() != WL_CONNECTED) {
+        connectWiFi();
+    }
+    
+    // Read temperature and humidity from DHT11
+    Load_DHT11_Data();
+    
+    // Create POST data string with temperature and humidity
+    String postData = "temperature=" + String(temperature) + "&humidity=" + String(humidity);
+    
+    // Create HTTP client object
+    HTTPClient http;
+    
+    // Connect to the PHP file on XAMPP server
+    http.begin(URL);
+    
+    // Add header to specify the type of data being sent
+    http.addHeader("Content-Type", "application/x-www-form-urlencoded");
+    
+    // Send POST request with temperature and humidity data
+    int httpCode = http.POST(postData);
+    
+    // Get response from server
+    String payload = http.getString();
+    
+    // Print debug information to Serial Monitor
+    Serial.print("URL: ");
+    Serial.println(URL);
+    Serial.print("Data Sent: ");
+    Serial.println(postData);
+    Serial.print("HTTP Code: ");
+    Serial.println(httpCode);  // 200 = success
+    Serial.print("Server Response: ");
+    Serial.println(payload);
+    Serial.println("--------------------------------------------------");
+    
+    // Close the HTTP connection
+    http.end();
+    
+    // Wait 5 seconds before sending next request
+    delay(5000);
+}
+
+// ============================================================
+// FUNCTION: Read DHT11 temperature and humidity
+// ============================================================
+void Load_DHT11_Data() {
+    // Read temperature in Celsius
+    temperature = dht11.readTemperature();
+    
+    // Read humidity percentage
+    humidity = dht11.readHumidity();
+    
+    // Check if readings are valid (NaN = Not a Number = error)
+    if (isnan(temperature) || isnan(humidity)) {
+        Serial.println("Failed to read from DHT11 sensor!");
+        temperature = 0;
+        humidity = 0;
+    }
+    
+    // Print sensor data to Serial Monitor
+    Serial.printf("Temperature: %d °C\n", temperature);
+    Serial.printf("Humidity: %d %%\n", temperature);
+}
+
+// ============================================================
+// FUNCTION: Connect ESP32 to WiFi network
+// ============================================================
+void connectWiFi() {
+    // Turn off WiFi mode
+    WiFi.mode(WIFI_OFF);
+    delay(1000);
+    
+    // Enable WiFi Station mode (connect to router)
+    WiFi.mode(WIFI_STA);
+    
+    // Start connecting to WiFi network
+    WiFi.begin(ssid, password);
+    
+    Serial.println("\nConnecting to WiFi...");
+    
+    // Wait until connected (with timeout)
+    int attempts = 0;
+    while (WiFi.status() != WL_CONNECTED && attempts < 30) {
+        delay(500);
+        Serial.print(".");
+        attempts++;
+    }
+    
+    // Print WiFi connection status
+    Serial.println("");
+    Serial.print("Connected to: ");
+    Serial.println(ssid);
+    Serial.print("IP Address: ");
+    Serial.println(WiFi.localIP());
+}
+
